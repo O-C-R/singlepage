@@ -26,8 +26,21 @@ func TestSinglePageApplicationServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	server := httptest.NewServer(
-		NewSinglePageApplication(http.Dir(`./root`), application))
+	longtermCache, err := regexp.Compile(`\.js$`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	singlePageApplication, err := NewSinglePageApplication(SinglePageApplicationOptions{
+		Root:          "./root",
+		Application:   application,
+		LongtermCache: longtermCache,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server := httptest.NewServer(singlePageApplication)
 	defer server.Close()
 
 	for _, request := range testRequests {
@@ -58,5 +71,7 @@ func TestSinglePageApplicationServer(t *testing.T) {
 		if !bytes.Equal(responseBytes, []byte(request.response)) {
 			t.Errorf("unexpected response, %s (expected %s)", string(responseBytes), request.response)
 		}
+
+		t.Log(response.Header)
 	}
 }
