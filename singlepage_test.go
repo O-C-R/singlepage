@@ -1,40 +1,19 @@
 package singlepage
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
+	"fmt"
 	"net/http/httptest"
-	"regexp"
+	"os"
 	"testing"
+	"time"
 )
 
-var testRequests = []struct {
-	path, redirect, response string
-}{
-	{"/", "/", "application"},
-	{"/index.html", "/", "application"},
-	{"/application/", "/application", "application"},
-	{"/application/index.html", "/application", "application"},
-	{"/some/path/that/works", "/some/path/that/works", "application"},
-	{"/static/js/index.js", "/static/js/index.js", "console.log('index.js')"},
-}
-
 func TestSinglePageApplicationServer(t *testing.T) {
-	application, err := regexp.Compile(`^/(([\w-]+)(/[\w-]+)*)?$`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	longtermCache, err := regexp.Compile(`\.js$`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	singlePageApplication, err := NewSinglePageApplication(SinglePageApplicationOptions{
-		Root:          "./root",
-		Application:   application,
-		LongtermCache: longtermCache,
+	singlePageApplication, err := NewSinglepageApplication(SinglepageApplicationOptions{
+		Root: "./root",
+		ApplicationMatcher: func(path string) (bool, error) {
+			return path == "/", nil
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -43,35 +22,8 @@ func TestSinglePageApplicationServer(t *testing.T) {
 	server := httptest.NewServer(singlePageApplication)
 	defer server.Close()
 
-	for _, request := range testRequests {
-
-		req, err := http.NewRequest("GET", server.URL+request.path, nil)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		response, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		if response.Request.URL.Path != request.redirect {
-			t.Errorf("unexpected redirect, %s (expected %s)", response.Request.URL.Path, request.redirect)
-			continue
-		}
-
-		responseBytes, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		if !bytes.Equal(responseBytes, []byte(request.response)) {
-			t.Errorf("unexpected response, %s (expected %s)", string(responseBytes), request.response)
-		}
-
-		t.Log(response.Header)
+	if os.Getenv("TEST_SERVER") == "1" {
+		fmt.Println(server.URL)
+		time.Sleep(time.Hour)
 	}
 }
